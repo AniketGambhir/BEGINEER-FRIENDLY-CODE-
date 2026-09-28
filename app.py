@@ -1,11 +1,13 @@
 from flask import Flask, render_template, request, jsonify
 import re
-import subprocess
-import tempfile
 import os
-import shutil
 
 app = Flask(__name__)
+
+
+# ============================================================
+# LANGUAGE INFORMATION
+# ============================================================
 
 LANGUAGES = {
     "java": {
@@ -23,33 +25,67 @@ LANGUAGES = {
 }
 
 
-# ---------------------------------------------------------
+# ============================================================
+# HOME PAGE
+# ============================================================
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+
+# ============================================================
 # LANGUAGE DETECTION
-# ---------------------------------------------------------
+# ============================================================
 
 def detect_language(code):
     """
-    Automatically detect whether the code is Java, Python or C.
+    Automatically detects whether the code is Java, Python or C.
     """
 
+    if not code or not code.strip():
+        return "java"
+
+    # --------------------------------------------------------
+    # Java patterns
+    # --------------------------------------------------------
+
     java_patterns = [
-        r"\bpublic\s+class\b",
-        r"\bprivate\s+class\b",
-        r"\bSystem\.out\.",
-        r"\bpublic\s+static\s+void\s+main\b",
+        r"\bpublic\s+class\s+\w+",
+        r"\bprivate\s+class\s+\w+",
+        r"\bprotected\s+class\s+\w+",
+        r"\bpublic\s+static\s+void\s+main",
+        r"\bSystem\.out\.println",
+        r"\bSystem\.out\.print",
+        r"\bSystem\.out\.printf",
         r"\bimport\s+java\.",
-        r"\bString\s*\[\]"
+        r"\bextends\s+\w+",
+        r"\bimplements\s+\w+",
+        r"\bString\[\]\s+\w+"
     ]
 
+    # --------------------------------------------------------
+    # Python patterns
+    # --------------------------------------------------------
+
     python_patterns = [
-        r"\bdef\s+\w+\s*\(",
-        r"\bimport\s+\w+",
-        r"\bfrom\s+\w+\s+import\b",
+        r"^\s*def\s+\w+\s*\(",
+        r"^\s*class\s+\w+.*:",
         r"\bprint\s*\(",
-        r"\bif\s+.*:",
-        r"\b__name__\b",
-        r"\bfor\s+\w+\s+in\s+"
+        r"\bimport\s+\w+",
+        r"\bfrom\s+\w+\s+import",
+        r"__name__",
+        r"__main__",
+        r"\bself\.",
+        r"\belif\b",
+        r"\bNone\b",
+        r"\bTrue\b",
+        r"\bFalse\b"
     ]
+
+    # --------------------------------------------------------
+    # C patterns
+    # --------------------------------------------------------
 
     c_patterns = [
         r"#include\s*<stdio\.h>",
@@ -58,23 +94,26 @@ def detect_language(code):
         r"\bprintf\s*\(",
         r"\bscanf\s*\(",
         r"\bmalloc\s*\(",
+        r"\bfree\s*\(",
+        r"\bstruct\s+\w+",
         r"\bchar\s+\w+\s*\["
     ]
 
-    java_score = sum(
-        bool(re.search(pattern, code))
-        for pattern in java_patterns
-    )
+    java_score = 0
+    python_score = 0
+    c_score = 0
 
-    python_score = sum(
-        bool(re.search(pattern, code))
-        for pattern in python_patterns
-    )
+    for pattern in java_patterns:
+        if re.search(pattern, code, re.MULTILINE):
+            java_score += 1
 
-    c_score = sum(
-        bool(re.search(pattern, code))
-        for pattern in c_patterns
-    )
+    for pattern in python_patterns:
+        if re.search(pattern, code, re.MULTILINE):
+            python_score += 1
+
+    for pattern in c_patterns:
+        if re.search(pattern, code, re.MULTILINE):
+            c_score += 1
 
     scores = {
         "java": java_score,
@@ -84,19 +123,46 @@ def detect_language(code):
 
     detected = max(scores, key=scores.get)
 
+    # If no useful pattern was found, default to Java
     if scores[detected] == 0:
-        return "unknown"
+        return "java"
 
     return detected
 
 
-# ---------------------------------------------------------
-# MISSING SEMICOLON CHECK
-# ---------------------------------------------------------
+# ============================================================
+# HELPER FUNCTION
+# ============================================================
 
-def check_missing_semicolon(code, language):
+def make_diagnostic(
+    error_type,
+    message,
+    simple,
+    fix,
+    line_number=None,
+    line_text=None
+):
     """
-    Detect common missing semicolon errors in Java and C.
+    Creates a standard error response.
+    """
+
+    return {
+        "type": error_type,
+        "message": message,
+        "simple": simple,
+        "fix": fix,
+        "line": line_number,
+        "line_text": line_text
+    }
+
+
+# ============================================================
+# MISSING SEMICOLON CHECK
+# ============================================================
+
+def missing_semicolon(code, language):
+    """
+    Checks Java and C code for likely missing semicolons.
     """
 
     if language not in ["java", "c"]:
@@ -104,29 +170,18 @@ def check_missing_semicolon(code, language):
 
     lines = code.splitlines()
 
+    # Lines that normally do not require semicolon
     ignored_starts = (
-        "if ",
-        "if(",
-        "for ",
-        "for(",
-        "while ",
-        "while(",
-        "switch ",
-        "switch(",
-        "else",
-        "try",
-        "catch",
-        "finally",
-        "class ",
-        "public class",
-        "private class",
-        "protected class",
-        "static class",
-        "{",
-        "}",
         "//",
         "/*",
-        "*"
+        "*",
+        "#",
+        "import ",
+        "package ",
+        "public class ",
+        "class ",
+        "interface ",
+        "enum "
     )
 
     for index, original_line in enumerate(lines):
@@ -136,584 +191,704 @@ def check_missing_semicolon(code, language):
         if not line:
             continue
 
-        if line.startswith(ignored_starts):
+        # Ignore comments
+        if line.startswith("//"):
             continue
 
-        if line.endswith(("{", "}", ";", ":")):
+        if line.startswith("/*"):
             continue
 
-        # Java / C common statements
-        patterns = [
-            r"System\.out\.print",
-            r"System\.out\.println",
-            r"printf\s*\(",
-            r"scanf\s*\(",
-            r"\breturn\b",
-            r"\bint\s+\w+\s*=",
-            r"\bfloat\s+\w+\s*=",
-            r"\bdouble\s+\w+\s*=",
-            r"\bchar\s+\w+\s*=",
-            r"\bString\s+\w+\s*=",
-            r"\w+\s*=\s*.+",
+        # Ignore annotations
+        if line.startswith("@"):
+            continue
+
+        # Ignore preprocessor statements in C
+        if language == "c" and line.startswith("#"):
+            continue
+
+        # Ignore opening/closing blocks
+        if line.endswith("{"):
+            continue
+
+        if line in ["}", "};", "{"]:
+            continue
+
+        # Java/C control statements that normally don't end with ;
+        control_patterns = [
+            r"^if\s*\(",
+            r"^else\b",
+            r"^else\s+if\s*\(",
+            r"^for\s*\(",
+            r"^while\s*\(",
+            r"^switch\s*\(",
+            r"^case\s+",
+            r"^default\s*:",
+            r"^try\b",
+            r"^catch\s*\(",
+            r"^finally\b",
+            r"^do\b"
         ]
 
-        for pattern in patterns:
-            if re.search(pattern, line):
+        is_control_statement = False
 
-                return {
-                    "type": "missing_semicolon",
-                    "line": index + 1,
-                    "message": "Semicolon (;) is missing after this line.",
-                    "simple": (
+        for pattern in control_patterns:
+            if re.match(pattern, line):
+                is_control_statement = True
+                break
+
+        if is_control_statement:
+            continue
+
+        # Lines already ending correctly
+        if line.endswith(";"):
+            continue
+
+        # Lines ending with block characters
+        if line.endswith("{"):
+            continue
+
+        if line.endswith("}"):
+            continue
+
+        # Java class/method declarations
+        if language == "java":
+
+            if re.match(
+                r"^(public|private|protected)?\s*"
+                r"(static\s+)?"
+                r"(final\s+)?"
+                r"(void|int|double|float|long|short|byte|char|boolean|String)"
+                r"\s+\w+\s*\([^)]*\)\s*$",
+                line
+            ):
+                continue
+
+        # C function declarations
+        if language == "c":
+
+            if re.match(
+                r"^(int|void|char|float|double|long|short)\s+"
+                r"\w+\s*\([^)]*\)\s*$",
+                line
+            ):
+                continue
+
+        # Statements that commonly require semicolon
+        statement_patterns = [
+
+            # Output
+            r"^System\.out\.(println|print|printf)\s*\(",
+            r"^printf\s*\(",
+            r"^scanf\s*\(",
+
+            # Variable declarations
+            r"^(int|float|double|char|long|short|byte|boolean|String)\s+",
+            r"^(unsigned|signed)\s+",
+
+            # Assignment
+            r"^\w+\s*=",
+            r"^\w+\s*\+=\s*",
+            r"^\w+\s*-=\s*",
+            r"^\w+\s*\*=\s*",
+            r"^\w+\s*/=\s*",
+
+            # return / break / continue
+            r"^return\b",
+            r"^break\b",
+            r"^continue\b",
+
+            # Object creation
+            r"^(new\s+)",
+            r"^\w+\s+\w+\s*=\s*new\s+",
+
+            # Method calls
+            r"^\w+\.\w+\s*\(",
+
+            # Function calls
+            r"^\w+\s*\(",
+
+            # C memory functions
+            r"^malloc\s*\(",
+            r"^free\s*\("
+        ]
+
+        for pattern in statement_patterns:
+
+            if re.match(pattern, line):
+
+                return make_diagnostic(
+                    "missing_semicolon",
+                    "Semicolon (;) is missing after this line.",
+                    (
                         f"{LANGUAGES[language]['name']} expects a semicolon "
                         "at the end of this statement."
                     ),
-                    "fix": line + ";"
-                }
+                    f"Add ; after: {line}",
+                    index + 1,
+                    original_line
+                )
 
     return None
 
 
-# ---------------------------------------------------------
+# ============================================================
 # PYTHON COLON CHECK
-# ---------------------------------------------------------
+# ============================================================
 
-def check_python_colon(code):
+def python_block_error(code):
     """
-    Detect missing colon after common Python blocks.
+    Checks Python block statements for a missing colon.
     """
 
     lines = code.splitlines()
 
     block_patterns = [
-        r"^\s*if\b.*[^:]\s*$",
-        r"^\s*elif\b.*[^:]\s*$",
+        r"^\s*if\b.*\)\s*$",
+        r"^\s*elif\b.*\)\s*$",
         r"^\s*else\s*$",
-        r"^\s*for\b.*[^:]\s*$",
-        r"^\s*while\b.*[^:]\s*$",
-        r"^\s*def\b.*\)\s*$",
-        r"^\s*class\b.*[^:]\s*$",
+        r"^\s*for\b.*\s*$",
+        r"^\s*while\b.*\s*$",
+        r"^\s*def\s+\w+\s*\([^)]*\)\s*$",
+        r"^\s*class\s+\w+.*$",
         r"^\s*try\s*$",
-        r"^\s*except\b.*[^:]\s*$",
-        r"^\s*finally\s*$"
+        r"^\s*except\b.*$",
+        r"^\s*finally\s*$",
+        r"^\s*with\b.*$"
     ]
 
-    for index, line in enumerate(lines):
+    for index, original_line in enumerate(lines):
 
-        stripped = line.strip()
+        line = original_line.strip()
 
-        if not stripped:
+        if not line:
+            continue
+
+        if line.startswith("#"):
+            continue
+
+        # Correct block line
+        if line.endswith(":"):
             continue
 
         for pattern in block_patterns:
 
-            if re.match(pattern, line) and not stripped.endswith(":"):
+            if re.match(pattern, line):
 
-                return {
-                    "type": "missing_colon",
-                    "line": index + 1,
-                    "message": "Colon (:) is missing.",
-                    "simple": (
-                        "Python needs a colon at the end of this block statement."
+                return make_diagnostic(
+                    "missing_colon",
+                    "Colon (:) is missing after this Python statement.",
+                    (
+                        "Python uses a colon to start a block after "
+                        "if, else, for, while, def, class, try, etc."
                     ),
-                    "fix": stripped + ":"
-                }
+                    f"Add : after: {line}",
+                    index + 1,
+                    original_line
+                )
 
     return None
 
 
-# ---------------------------------------------------------
-# COMMON SYNTAX CHECKS
-# ---------------------------------------------------------
+# ============================================================
+# UNMATCHED QUOTES
+# ============================================================
 
-def check_common_errors(code, language):
+def check_unmatched_quotes(code):
+    """
+    Checks for basic unmatched quotation marks.
+    """
 
-    # Unclosed double quote
-    for index, line in enumerate(code.splitlines()):
+    lines = code.splitlines()
 
-        quote_count = line.count('"')
+    for index, original_line in enumerate(lines):
 
-        if quote_count % 2 != 0:
+        line = original_line.strip()
 
-            return {
-                "type": "unclosed_string",
-                "line": index + 1,
-                "message": "A string quotation mark is not closed.",
-                "simple": (
-                    "You started a string with a double quote (\") "
-                    "but did not close it."
+        if not line:
+            continue
+
+        # Remove comments approximately
+        code_part = line.split("//")[0]
+        code_part = code_part.split("#")[0]
+
+        double_quotes = code_part.count('"')
+        single_quotes = code_part.count("'")
+
+        if double_quotes % 2 != 0:
+
+            return make_diagnostic(
+                "unmatched_quote",
+                "A double quote (\") is not closed.",
+                (
+                    "You opened a string with a double quote, "
+                    "but another double quote is missing."
                 ),
-                "fix": 'Add the missing " at the end of the string.'
-            }
+                f"Close the string with another \": {line}",
+                index + 1,
+                original_line
+            )
 
-    # Java case sensitivity
-    if language == "java":
+        if single_quotes % 2 != 0:
 
-        if re.search(r"\bsystem\.out", code):
-            return {
-                "type": "java_case_error",
-                "line": None,
-                "message": "Java is case-sensitive.",
-                "simple": (
-                    "Use System.out instead of system.out."
+            return make_diagnostic(
+                "unmatched_quote",
+                "A single quote (') is not closed.",
+                (
+                    "You opened a string with a single quote, "
+                    "but another single quote is missing."
                 ),
-                "fix": "Replace system.out with System.out."
-            }
-
-        if re.search(r"\bSystem\.out\.Println", code):
-            return {
-                "type": "java_case_error",
-                "line": None,
-                "message": "Java method names are case-sensitive.",
-                "simple": (
-                    "The correct method is println with a small p."
-                ),
-                "fix": "Use System.out.println(...);"
-            }
+                f"Close the string with another ': {line}",
+                index + 1,
+                original_line
+            )
 
     return None
 
 
-# ---------------------------------------------------------
-# ERROR EXPLANATION
-# ---------------------------------------------------------
+# ============================================================
+# JAVA CASE-SENSITIVITY CHECK
+# ============================================================
 
-def explain_compiler_error(error_text, language):
+def check_java_case_errors(code, language):
 
-    if not error_text:
+    if language != "java":
         return None
 
-    text = error_text.lower()
+    lines = code.splitlines()
 
-    # Missing semicolon
-    if "expected ';'" in text or "expected ;" in text:
-        return {
-            "type": "missing_semicolon",
-            "message": "Semicolon (;) is missing.",
-            "simple": (
-                f"{LANGUAGES.get(language, {}).get('name', 'The language')} "
-                "expects a semicolon at the end of this statement."
-            ),
-            "fix": "Add ; at the end of the statement."
-        }
+    for index, original_line in enumerate(lines):
 
-    # Java cannot find symbol
-    if "cannot find symbol" in text:
+        line = original_line.strip()
 
-        return {
-            "type": "unknown_symbol",
-            "message": "The program cannot find the name you used.",
-            "simple": (
-                "Check the variable, method or class name. "
-                "Make sure it is declared and spelled correctly."
-            ),
-            "fix": "Check spelling and declaration."
-        }
+        # system.out instead of System.out
+        if "system.out" in line:
 
-    # Java incompatible types
-    if "incompatible types" in text:
+            fixed = line.replace("system.out", "System.out")
 
-        return {
-            "type": "type_error",
-            "message": "The data types do not match.",
-            "simple": (
-                "You are trying to put one type of value "
-                "into another incompatible type."
-            ),
-            "fix": "Check the variable type and assigned value."
-        }
+            return make_diagnostic(
+                "java_case_error",
+                "Java is case-sensitive: use System.out.",
+                (
+                    "Java treats uppercase and lowercase letters "
+                    "as different characters."
+                ),
+                f"Use: {fixed}",
+                index + 1,
+                original_line
+            )
 
-    # Python syntax error
-    if "syntaxerror" in text:
+        # println spelling
+        if "Println" in line:
 
-        return {
-            "type": "syntax_error",
-            "message": "Python found a syntax error.",
-            "simple": (
-                "Check brackets, colons, quotation marks, "
-                "indentation and spelling."
-            ),
-            "fix": "Check the line mentioned in the Python error."
-        }
+            fixed = line.replace("Println", "println")
 
-    # C undeclared identifier
-    if "undeclared" in text:
+            return make_diagnostic(
+                "java_case_error",
+                "Java is case-sensitive: use println.",
+                (
+                    "The correct Java method name is println with "
+                    "a lowercase p."
+                ),
+                f"Use: {fixed}",
+                index + 1,
+                original_line
+            )
 
-        return {
-            "type": "undeclared",
-            "message": "A variable was used before it was declared.",
-            "simple": (
-                "Declare the variable before using it."
-            ),
-            "fix": "Add a variable declaration."
-        }
+        # Java String typo
+        if re.search(r"\bstring\b", line):
 
-    return {
-        "type": "compiler_error",
-        "message": "The compiler found an error.",
-        "simple": (
-            "Read the compiler message and check the line mentioned."
-        ),
-        "fix": "Check the syntax around the reported line."
+            fixed = re.sub(r"\bstring\b", "String", line)
+
+            return make_diagnostic(
+                "java_case_error",
+                "Java uses String with a capital S.",
+                (
+                    "Java class names are case-sensitive. "
+                    "The correct type is String."
+                ),
+                f"Use: {fixed}",
+                index + 1,
+                original_line
+            )
+
+    return None
+
+
+# ============================================================
+# BRACKET CHECK
+# ============================================================
+
+def check_brackets(code):
+    """
+    Performs a basic bracket balance check.
+    """
+
+    pairs = {
+        ")": "(",
+        "]": "[",
+        "}": "{"
     }
 
+    opening = set(pairs.values())
 
-# ---------------------------------------------------------
-# RUN JAVA
-# ---------------------------------------------------------
+    stack = []
 
-def run_java(code):
+    lines = code.splitlines()
 
-    temp_dir = tempfile.mkdtemp()
+    for index, line in enumerate(lines):
 
-    try:
+        # Remove simple string contents to reduce false positives
+        cleaned = re.sub(r'"(?:\\.|[^"\\])*"', '""', line)
+        cleaned = re.sub(r"'(?:\\.|[^'\\])*'", "''", cleaned)
 
-        java_file = os.path.join(temp_dir, "Main.java")
+        for char in cleaned:
 
-        with open(java_file, "w", encoding="utf-8") as file:
-            file.write(code)
+            if char in opening:
+                stack.append(char)
 
-        compile_process = subprocess.run(
-            ["javac", java_file],
-            capture_output=True,
-            text=True,
-            timeout=8
+            elif char in pairs:
+
+                if not stack or stack[-1] != pairs[char]:
+
+                    return make_diagnostic(
+                        "bracket_error",
+                        f"Unexpected closing bracket: {char}",
+                        (
+                            "A closing bracket does not have a matching "
+                            "opening bracket."
+                        ),
+                        "Check the brackets near this line.",
+                        index + 1,
+                        line
+                    )
+
+                stack.pop()
+
+    if stack:
+
+        expected = {
+            "(": ")",
+            "[": "]",
+            "{": "}"
+        }
+
+        missing = expected.get(stack[-1], "")
+
+        return make_diagnostic(
+            "bracket_error",
+            f"A closing bracket {missing} may be missing.",
+            (
+                "You opened a bracket but the matching closing "
+                "bracket was not found."
+            ),
+            f"Add the matching closing bracket: {missing}",
+            None,
+            None
         )
 
-        if compile_process.returncode != 0:
-
-            return {
-                "success": False,
-                "output": compile_process.stderr
-            }
-
-        run_process = subprocess.run(
-            ["java", "-cp", temp_dir, "Main"],
-            capture_output=True,
-            text=True,
-            timeout=8
-        )
-
-        return {
-            "success": run_process.returncode == 0,
-            "output": (
-                run_process.stdout
-                if run_process.returncode == 0
-                else run_process.stderr
-            )
-        }
-
-    except FileNotFoundError:
-
-        return {
-            "success": False,
-            "output": "Java/JDK is not installed or not available in PATH."
-        }
-
-    except subprocess.TimeoutExpired:
-
-        return {
-            "success": False,
-            "output": "Program took too long to run."
-        }
-
-    finally:
-
-        shutil.rmtree(temp_dir, ignore_errors=True)
+    return None
 
 
-# ---------------------------------------------------------
-# RUN C
-# ---------------------------------------------------------
+# ============================================================
+# PYTHON INDENTATION CHECK
+# ============================================================
 
-def run_c(code):
-
-    temp_dir = tempfile.mkdtemp()
-
-    try:
-
-        c_file = os.path.join(temp_dir, "main.c")
-        exe_file = os.path.join(temp_dir, "main.exe")
-
-        with open(c_file, "w", encoding="utf-8") as file:
-            file.write(code)
-
-        compile_process = subprocess.run(
-            ["gcc", c_file, "-o", exe_file],
-            capture_output=True,
-            text=True,
-            timeout=8
-        )
-
-        if compile_process.returncode != 0:
-
-            return {
-                "success": False,
-                "output": compile_process.stderr
-            }
-
-        run_process = subprocess.run(
-            [exe_file],
-            capture_output=True,
-            text=True,
-            timeout=8
-        )
-
-        return {
-            "success": run_process.returncode == 0,
-            "output": (
-                run_process.stdout
-                if run_process.returncode == 0
-                else run_process.stderr
-            )
-        }
-
-    except FileNotFoundError:
-
-        return {
-            "success": False,
-            "output": "GCC is not installed or not available in PATH."
-        }
-
-    except subprocess.TimeoutExpired:
-
-        return {
-            "success": False,
-            "output": "Program took too long to run."
-        }
-
-    finally:
-
-        shutil.rmtree(temp_dir, ignore_errors=True)
-
-
-# ---------------------------------------------------------
-# RUN PYTHON
-# ---------------------------------------------------------
-
-def run_python(code):
-
-    temp_dir = tempfile.mkdtemp()
-
-    try:
-
-        python_file = os.path.join(temp_dir, "main.py")
-
-        with open(python_file, "w", encoding="utf-8") as file:
-            file.write(code)
-
-        run_process = subprocess.run(
-            ["python", python_file],
-            capture_output=True,
-            text=True,
-            timeout=8
-        )
-
-        return {
-            "success": run_process.returncode == 0,
-            "output": (
-                run_process.stdout
-                if run_process.returncode == 0
-                else run_process.stderr
-            )
-        }
-
-    except FileNotFoundError:
-
-        return {
-            "success": False,
-            "output": "Python is not installed or not available in PATH."
-        }
-
-    except subprocess.TimeoutExpired:
-
-        return {
-            "success": False,
-            "output": "Program took too long to run."
-        }
-
-    finally:
-
-        shutil.rmtree(temp_dir, ignore_errors=True)
-
-
-# ---------------------------------------------------------
-# RUN PROGRAM
-# ---------------------------------------------------------
-
-def run_program(code, language):
-
-    if language == "java":
-        return run_java(code)
-
-    if language == "python":
-        return run_python(code)
-
-    if language == "c":
-        return run_c(code)
-
-    return {
-        "success": False,
-        "output": "Unsupported programming language."
-    }
-
-
-# ---------------------------------------------------------
-# MAIN ANALYSIS API
-# ---------------------------------------------------------
-
-@app.route("/api/analyze", methods=["POST"])
-def analyze():
-
-    data = request.get_json()
-
-    code = data.get("code", "")
-    language = data.get("language", "auto")
-    execute = data.get("execute", True)
+def check_python_indentation(code):
 
     if not code.strip():
+        return None
 
-        return jsonify({
-            "success": False,
-            "message": "Please enter some code."
-        })
+    lines = code.splitlines()
 
-    # Auto detection
-    if language == "auto":
+    previous_requires_indent = False
+    previous_indent = 0
 
-        language = detect_language(code)
+    for index, original_line in enumerate(lines):
 
-    if language not in LANGUAGES:
+        if not original_line.strip():
+            continue
 
-        return jsonify({
-            "success": False,
-            "message": "Could not detect the programming language.",
-            "suggestion": (
-                "Select Java, Python or C manually."
-            )
-        })
+        stripped = original_line.lstrip()
+
+        if stripped.startswith("#"):
+            continue
+
+        current_indent = len(original_line) - len(stripped)
+
+        if previous_requires_indent:
+
+            if current_indent <= previous_indent:
+
+                return make_diagnostic(
+                    "indentation_error",
+                    "Python indentation may be incorrect.",
+                    (
+                        "Python uses indentation to show which statements "
+                        "belong inside a block."
+                    ),
+                    "Indent this line by 4 spaces.",
+                    index + 1,
+                    original_line
+                )
+
+        if stripped.endswith(":"):
+
+            previous_requires_indent = True
+            previous_indent = current_indent
+
+        else:
+
+            previous_requires_indent = False
+
+    return None
+
+
+# ============================================================
+# GENERAL ERROR CHECK
+# ============================================================
+
+def common_error(code, language):
+
+    # Check unmatched quotes
+    quote_error = check_unmatched_quotes(code)
+
+    if quote_error:
+        return quote_error
+
+    # Java case errors
+    java_error = check_java_case_errors(code, language)
+
+    if java_error:
+        return java_error
+
+    # Bracket check
+    bracket_error = check_brackets(code)
+
+    if bracket_error:
+        return bracket_error
+
+    # Python indentation
+    if language == "python":
+
+        indentation_error = check_python_indentation(code)
+
+        if indentation_error:
+            return indentation_error
+
+    return None
+
+
+# ============================================================
+# ANALYZE CODE
+# ============================================================
+
+def analyze_code(code, language):
 
     diagnostics = []
 
-    # Check missing semicolon
-    semicolon_error = check_missing_semicolon(
-        code,
-        language
-    )
+    # --------------------------------------------------------
+    # Missing semicolon
+    # --------------------------------------------------------
 
-    if semicolon_error:
-        diagnostics.append(semicolon_error)
+    if language in ["java", "c"]:
 
-    # Python colon
-    colon_error = None
-
-    if language == "python":
-
-        colon_error = check_python_colon(code)
-
-        if colon_error:
-            diagnostics.append(colon_error)
-
-    # Common errors
-    common_error = check_common_errors(
-        code,
-        language
-    )
-
-    if common_error:
-        diagnostics.append(common_error)
-
-    compiler_output = ""
-    ran = False
-
-    # Execute code
-    if execute:
-
-        result = run_program(
+        semicolon_error = missing_semicolon(
             code,
             language
         )
 
-        ran = True
-        compiler_output = result["output"]
+        if semicolon_error:
+            diagnostics.append(semicolon_error)
 
-        if not result["success"]:
+    # --------------------------------------------------------
+    # Python colon
+    # --------------------------------------------------------
 
-            compiler_explanation = explain_compiler_error(
-                compiler_output,
-                language
-            )
+    if language == "python":
 
-            if compiler_explanation:
-                diagnostics.append(
-                    compiler_explanation
-                )
+        colon_error = python_block_error(code)
 
-    # Remove duplicate errors
-    unique_diagnostics = []
+        if colon_error:
+            diagnostics.append(colon_error)
 
-    seen = set()
+    # --------------------------------------------------------
+    # Common errors
+    # --------------------------------------------------------
 
-    for diagnostic in diagnostics:
+    common = common_error(code, language)
 
-        key = (
-            diagnostic.get("type"),
-            diagnostic.get("line"),
-            diagnostic.get("message")
+    if common:
+
+        # Avoid adding the same error twice
+        duplicate = False
+
+        for diagnostic in diagnostics:
+
+            if diagnostic["type"] == common["type"]:
+
+                duplicate = True
+                break
+
+        if not duplicate:
+            diagnostics.append(common)
+
+    return diagnostics
+
+
+# ============================================================
+# API: ANALYZE
+# ============================================================
+
+@app.route("/api/analyze", methods=["POST"])
+def analyze():
+
+    try:
+
+        data = request.get_json(silent=True)
+
+        if not data:
+
+            return jsonify({
+                "success": False,
+                "message": "No code data was received."
+            }), 400
+
+        code = data.get("code", "")
+        requested_language = data.get("language", "auto")
+
+        if not isinstance(code, str):
+
+            return jsonify({
+                "success": False,
+                "message": "Code must be text."
+            }), 400
+
+        if not code.strip():
+
+            return jsonify({
+                "success": False,
+                "message": "Please enter some code first."
+            }), 400
+
+        # ----------------------------------------------------
+        # Validate requested language
+        # ----------------------------------------------------
+
+        if requested_language not in [
+            "java",
+            "python",
+            "c",
+            "auto"
+        ]:
+
+            requested_language = "auto"
+
+        # ----------------------------------------------------
+        # Detect language
+        # ----------------------------------------------------
+
+        if requested_language == "auto":
+
+            detected_language = detect_language(code)
+
+        else:
+
+            detected_language = requested_language
+
+        # ----------------------------------------------------
+        # Analyze
+        # ----------------------------------------------------
+
+        diagnostics = analyze_code(
+            code,
+            detected_language
         )
 
-        if key not in seen:
+        # ----------------------------------------------------
+        # Response
+        # ----------------------------------------------------
 
-            seen.add(key)
-            unique_diagnostics.append(
-                diagnostic
-            )
+        if diagnostics:
+
+            first_error = diagnostics[0]
+
+            return jsonify({
+                "success": True,
+                "language": detected_language,
+                "language_name": LANGUAGES[detected_language]["name"],
+                "has_error": True,
+                "diagnostics": diagnostics,
+                "message": first_error["message"],
+                "simple": first_error["simple"],
+                "fix": first_error["fix"],
+                "line": first_error["line"],
+                "line_text": first_error["line_text"],
+                "ran": False,
+                "compiler_output": "",
+                "execution_disabled": True
+            })
+
+        # ----------------------------------------------------
+        # No detected error
+        # ----------------------------------------------------
+
+        return jsonify({
+            "success": True,
+            "language": detected_language,
+            "language_name": LANGUAGES[detected_language]["name"],
+            "has_error": False,
+            "diagnostics": [],
+            "message": "No common error was detected.",
+            "simple": (
+                "The basic checks passed. "
+                "This does not guarantee that the program is completely correct."
+            ),
+            "fix": "No automatic fix is needed.",
+            "line": None,
+            "line_text": None,
+            "ran": False,
+            "compiler_output": "",
+            "execution_disabled": True
+        })
+
+    except Exception as error:
+
+        return jsonify({
+            "success": False,
+            "message": "Something went wrong while analyzing the code.",
+            "details": str(error)
+        }), 500
+
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@app.route("/health")
+def health():
 
     return jsonify({
-        "success": True,
-        "language": language,
-        "language_name": LANGUAGES[language]["name"],
-        "diagnostics": unique_diagnostics,
-        "compiler_output": compiler_output,
-        "ran": ran
+        "status": "online",
+        "application": "CodeSense AI Error Tutor",
+        "languages": [
+            "Java",
+            "Python",
+            "C"
+        ],
+        "mode": "Static error analysis"
     })
 
 
-# ---------------------------------------------------------
-# HOME PAGE
-# ---------------------------------------------------------
-
-@app.route("/")
-def home():
-
-    return render_template(
-        "index.html"
-    )
-
-
-# ---------------------------------------------------------
-# START FLASK SERVER
-# ---------------------------------------------------------
+# ============================================================
+# APPLICATION START
+# ============================================================
 
 if __name__ == "__main__":
 
-    print()
-    print("=" * 60)
-    print("       CodeSense AI Error Tutor")
-    print("=" * 60)
-    print()
-    print("Website running at:")
-    print("http://127.0.0.1:5000")
-    print()
-    print("Supported languages:")
-    print("1. Java")
-    print("2. Python")
-    print("3. C")
-    print()
-    print("=" * 60)
+    port = int(os.environ.get("PORT", 5000))
 
     app.run(
-        host="127.0.0.1",
-        port=5000,
-        debug=True
+        host="0.0.0.0",
+        port=port,
+        debug=False
     )
