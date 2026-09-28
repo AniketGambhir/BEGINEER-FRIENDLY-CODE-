@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>CodeSense AI Error Tutor</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+<body>
+
+    <!-- Cursor Glow -->
+    <div class="cursor-glow"></div>
+
+
+    <!-- Background -->
+    <div class="background-grid"></div>
+
+
+    <!-- Navigation -->
+
+    <header class="navbar">
+
+        <div class="logo">
+
+            <div class="logo-icon">
+                &lt;/&gt;
+            </div>
+
+            <div>
+                <h2>CodeSense</h2>
+                <span>AI Error Tutor</span>
+            </div>
+
+        </div>
+
+
+        <div class="language-buttons">
+
+            <button
+                class="language-btn active"
+                data-language="java"
+            >
+                Java
+            </button>
+
+            <button
+                class="language-btn"
+                data-language="python"
+            >
+                Python
+            </button>
+
+            <button
+                class="language-btn"
+                data-language="c"
+            >
+                C
+            </button>
+
+            <button
+                class="language-btn auto-btn"
+                data-language="auto"
+            >
+                Auto Detect
+            </button>
+
+        </div>
+
+    </header>
+
+
+    <!-- Main -->
+
+    <main class="container">
+
+
+        <!-- Hero -->
+
+        <section class="hero">
+
+            <div class="hero-badge">
+                ● AI-INSPIRED LEARNING
+            </div>
+
+            <h1>
+                Find the
+                <span>error.</span>
+                <br>
+                Understand the
+                <span>error.</span>
+            </h1>
+
+            <p>
+                Write Java, Python or C code and get
+                beginner-friendly explanations instead of
+                confusing compiler messages.
+            </p>
+
+        </section>
+
+
+        <!-- Language Status -->
+
+        <section class="status-card">
+
+            <div>
+
+                <span class="status-label">
+                    DETECTED LANGUAGE
+                </span>
+
+                <h3 id="detectedLanguage">
+                    Java
+                </h3>
+
+            </div>
+
+            <div class="status-dot"></div>
+
+        </section>
+
+
+        <!-- Code Editor -->
+
+        <section class="editor-card">
+
+            <div class="editor-header">
+
+                <div class="file-info">
+
+                    <div class="file-icon" id="fileIcon">
+                        JAVA
+                    </div>
+
+                    <div>
+
+                        <strong id="fileName">
+                            Main.java
+                        </strong>
+
+                        <small>
+                            Code Editor
+                        </small>
+
+                    </div>
+
+                </div>
+
+
+                <div class="editor-actions">
+
+                    <button id="sampleBtn">
+                        Sample
+                    </button>
+
+                    <button id="clearBtn">
+                        Clear
+                    </button>
+
+                    <button id="copyBtn">
+                        Copy
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- Code Area -->
+
+            <div class="code-wrapper">
+
+                <div
+                    class="line-numbers"
+                    id="lineNumbers"
+                >
+                    1
+                </div>
+
+                <textarea
+                    id="codeEditor"
+                    spellcheck="false"
+                    autocomplete="off"
+                    autocorrect="off"
+                    autocapitalize="off"
+                ></textarea>
+
+            </div>
+
+
+            <!-- Editor Footer -->
+
+            <div class="editor-footer">
+
+                <div class="editor-info">
+
+                    <span id="lineCount">
+                        Lines: 1
+                    </span>
+
+                    <span id="charCount">
+                        Characters: 0
+                    </span>
+
+                </div>
+
+
+                <button
+                    class="run-btn"
+                    id="runBtn"
+                >
+
+                    <span>▶</span>
+
+                    RUN & EXPLAIN
+
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <!-- Tutor Output -->
+
+        <section class="output-section">
+
+            <div class="section-title">
+
+                <div>
+
+                    <span class="section-label">
+                        AI TUTOR
+                    </span>
+
+                    <h2>
+                        Error Explanation
+                    </h2>
+
+                </div>
+
+                <div
+                    class="output-status"
+                    id="outputStatus"
+                >
+                    READY
+                </div>
+
+            </div>
+
+
+            <div
+                class="output-card"
+                id="outputCard"
+            >
+
+                <div class="empty-output">
+
+                    <div class="empty-icon">
+                        ✦
+                    </div>
+
+                    <h3>
+                        Your explanation will appear here
+                    </h3>
+
+                    <p>
+                        Write your code and click
+                        <strong>Run & Explain</strong>.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- Features -->
+
+        <section class="features">
+
+            <div class="feature-card">
+
+                <div class="feature-number">
+                    01
+                </div>
+
+                <h3>
+                    Detect
+                </h3>
+
+                <p>
+                    Detects Java, Python and C code
+                    automatically.
+                </p>
+
+            </div>
+
+
+            <div class="feature-card">
+
+                <div class="feature-number">
+                    02
+                </div>
+
+                <h3>
+                    Explain
+                </h3>
+
+                <p>
+                    Converts technical errors into
+                    simple English.
+                </p>
+
+            </div>
+
+
+            <div class="feature-card">
+
+                <div class="feature-number">
+                    03
+                </div>
+
+                <h3>
+                    Fix
+                </h3>
+
+                <p>
+                    Shows a simple suggested correction
+                    for the error.
+                </p>
+
+            </div>
+
+
+            <div class="feature-card">
+
+                <div class="feature-number">
+                    04
+                </div>
+
+                <h3>
+                    Run
+                </h3>
+
+                <p>
+                    Runs Java, Python and C code locally
+                    and displays the result.
+                </p>
+
+            </div>
+
+        </section>
+
+
+        <!-- Quick Test -->
+
+        <section class="quick-test">
+
+            <div>
+
+                <span class="section-label">
+                    QUICK TEST
+                </span>
+
+                <h2>
+                    Try a missing semicolon
+                </h2>
+
+                <p>
+                    Test how CodeSense explains a common
+                    beginner error.
+                </p>
+
+            </div>
+
+            <button id="errorExampleBtn">
+                Load Error Example →
+            </button>
+
+        </section>
+
+
+    </main>
+
+
+    <!-- Footer -->
+
+    <footer>
+
+        <p>
+            CodeSense AI Error Tutor
+        </p>
+
+        <span>
+            Java • Python • C • Beginner Friendly
+        </span>
+
+    </footer>
+
+
+    <script
+        src="{{ url_for('static', filename='app.js') }}"
+    ></script>
+
+</body>
+
+</html>
