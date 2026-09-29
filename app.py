@@ -691,133 +691,216 @@ INDEX_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CodeSense AI Error Tutor</title>
+<title>CodeSense - AI Error Tutor</title>
 <style>
-:root{--cyan:#00f0ff;--green:#39ff14;--pink:#ff2d75;--text:#d8f7ff;--muted:#7fa3ab;--panel:#06090d;--line:#12333a}
+:root{
+  --bg:#020608;
+  --mint:#00f5d0;
+  --mint-dim:rgba(0,245,208,.16);
+  --mint-line:rgba(0,245,208,.28);
+  --white:#f4fffd;
+  --grey:#8a9a9d;
+  --card:#071013;
+  --red:#ff4d6d;
+  --ok:#3dff7a;
+}
 *{box-sizing:border-box}
-html,body{margin:0;background:#000;color:var(--text);font-family:"Segoe UI",system-ui,-apple-system,sans-serif}
-body{min-height:100vh;overflow-x:hidden}
-#cursorGlow{position:fixed;width:420px;height:420px;border-radius:50%;pointer-events:none;z-index:0;
-  background:radial-gradient(circle,rgba(0,240,255,.12),transparent 65%);transform:translate(-50%,-50%);left:-999px;top:-999px}
-.wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:18px 18px 40px}
-header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px}
-.brand{font-weight:800;letter-spacing:.5px;font-size:20px;color:var(--cyan);text-shadow:0 0 12px rgba(0,240,255,.8)}
-.brand small{display:block;color:var(--muted);font-weight:500;font-size:12px;text-shadow:none;letter-spacing:1px}
-.langs{display:flex;flex-wrap:wrap;gap:8px}
-.glow{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;
-  transition:border-color .2s,box-shadow .2s,transform .2s}
-.glow::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .2s;
-  background:radial-gradient(260px circle at var(--mx,50%) var(--my,50%),rgba(0,240,255,.18),transparent 60%)}
-.glow:hover{border-color:var(--cyan);box-shadow:0 0 20px rgba(0,240,255,.5),inset 0 0 14px rgba(0,240,255,.08)}
-.glow:hover::before{opacity:1}
-.lang{cursor:pointer;color:var(--text);font-weight:600;font-size:14px;font-family:inherit;padding:9px 18px;border-radius:999px}
-.lang.active{border-color:var(--green);color:var(--green);box-shadow:0 0 16px rgba(57,255,20,.55)}
-.hero{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:14px;margin-bottom:20px}
-h1{margin:0;font-size:clamp(26px,5vw,46px);line-height:1.05;letter-spacing:1px}
-h1 span{color:var(--cyan);text-shadow:0 0 18px rgba(0,240,255,.8)}
-h1 em{font-style:normal;color:var(--green);text-shadow:0 0 18px rgba(57,255,20,.7)}
-.detect{padding:12px 18px;text-align:right}
-.detect b{display:block;font-size:22px;color:var(--green);text-shadow:0 0 12px rgba(57,255,20,.7)}
-.detect small{color:var(--muted);letter-spacing:1.5px;font-size:11px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:850px){.grid{grid-template-columns:1fr}}
-.bar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);position:relative;z-index:1}
-.bar span{color:var(--muted);font-size:13px;letter-spacing:1px}
-.run{cursor:pointer;border:1px solid var(--green);background:#03130a;color:var(--green);font-weight:700;font-size:14px;font-family:inherit;
-  padding:9px 20px;border-radius:10px;transition:box-shadow .2s,background .2s}
-.run:hover{box-shadow:0 0 20px rgba(57,255,20,.8);background:#062a12}
-.run:disabled{opacity:.6;cursor:wait}
-.editor{display:flex;height:380px;position:relative;z-index:1}
-#gutter{width:46px;padding:12px 8px 12px 0;text-align:right;color:#3d6169;font:13px/1.55 Consolas,"Courier New",monospace;
-  overflow:hidden;background:#04070a;border-right:1px solid var(--line);user-select:none;white-space:pre}
-#gutter .err{color:#fff;background:var(--pink);box-shadow:0 0 10px var(--pink);display:block;border-radius:3px}
-#gutter div{display:block}
-#code{flex:1;resize:none;border:0;outline:0;background:transparent;color:#e8fbff;padding:12px;
-  font:13px/1.55 Consolas,"Courier New",monospace;white-space:pre;overflow:auto;tab-size:4}
-#out{padding:14px;height:380px;overflow:auto;position:relative;z-index:1}
-.card{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;background:#04070a}
-.card.bad{border-color:var(--pink);box-shadow:0 0 18px rgba(255,45,117,.45)}
-.card.good{border-color:var(--green);box-shadow:0 0 18px rgba(57,255,20,.4)}
-.badge{font-weight:800;letter-spacing:1px;font-size:15px}
-.bad .badge{color:var(--pink);text-shadow:0 0 10px rgba(255,45,117,.8)}
-.good .badge{color:var(--green);text-shadow:0 0 10px rgba(57,255,20,.8)}
-.line{display:inline-block;margin-left:8px;color:var(--cyan);font-size:13px}
-.msg{white-space:pre-wrap;margin:10px 0 0;line-height:1.55}
-.fixlabel{margin-top:12px;color:var(--muted);font-size:12px;letter-spacing:1.5px}
-pre.fix{margin:6px 0 0;padding:10px;border-radius:8px;background:#000;border:1px solid #0d4a2a;color:var(--green);
-  font:13px Consolas,"Courier New",monospace;white-space:pre-wrap;word-break:break-word}
-.hint{color:var(--muted);line-height:1.6}
-.samples{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0}
-.samples button{cursor:pointer;font-weight:600;font-size:13px;font-family:inherit;color:var(--text);padding:8px 14px;border-radius:10px}
-.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
-@media(max-width:700px){.steps{grid-template-columns:repeat(2,1fr)}}
-.step{padding:14px;text-align:center}
-.step b{display:block;color:var(--cyan);letter-spacing:2px;font-size:14px}
-.step small{color:var(--muted)}
-footer{margin-top:26px;text-align:center;color:#3d6169;font-size:12px}
+html{scroll-behavior:smooth}
+body{
+  margin:0;color:var(--white);min-height:100vh;overflow-x:hidden;
+  font-family:Inter,"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+  background:
+    radial-gradient(900px 520px at 8% 0%, rgba(0,245,208,.12), transparent 60%),
+    radial-gradient(760px 520px at 100% 100%, rgba(0,245,208,.10), transparent 60%),
+    var(--bg);
+  background-attachment:fixed;
+}
+#cursorGlow{
+  position:fixed;width:520px;height:520px;border-radius:50%;pointer-events:none;z-index:0;
+  background:radial-gradient(circle,rgba(0,245,208,.10),transparent 65%);
+  transform:translate(-50%,-50%);left:-999px;top:-999px;
+}
+
+/* ---------- top bar ---------- */
+.topbar{position:relative;z-index:2;background:rgba(3,10,12,.88);border-bottom:1px solid rgba(255,255,255,.05);backdrop-filter:blur(8px)}
+.topin{max-width:1240px;margin:0 auto;padding:22px 28px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:16px}
+.logobox{width:62px;height:62px;border-radius:18px;border:1.5px solid var(--mint);display:grid;place-items:center;
+  color:var(--mint);font:800 22px Consolas,monospace;box-shadow:0 0 22px rgba(0,245,208,.28),inset 0 0 14px rgba(0,245,208,.10)}
+.logo b{display:block;font-size:26px;letter-spacing:1px}
+.logo small{color:var(--grey);font-size:14px}
+.langs{display:flex;flex-wrap:wrap;gap:10px}
+.lang{cursor:pointer;font-family:inherit;font-weight:600;font-size:16px;color:var(--white);
+  background:#08161a;border:1px solid rgba(0,245,208,.14);border-radius:12px;padding:12px 22px;
+  transition:box-shadow .2s,border-color .2s,transform .2s,background .2s}
+.lang:hover{border-color:var(--mint);box-shadow:0 0 18px rgba(0,245,208,.35);transform:translateY(-2px)}
+.lang.active{background:var(--mint);color:#00120f;border-color:var(--mint);box-shadow:0 0 26px rgba(0,245,208,.55)}
+
+/* ---------- layout ---------- */
+.wrap{position:relative;z-index:1;max-width:1240px;margin:0 auto;padding:70px 28px 50px}
+.pill{display:inline-flex;align-items:center;gap:10px;padding:12px 22px;border-radius:999px;border:1px solid var(--mint-line);
+  color:var(--mint);font-weight:600;letter-spacing:2.5px;font-size:14px;background:rgba(0,245,208,.05)}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 10px var(--mint)}
+h1{margin:34px 0 26px;font-size:clamp(46px,9.5vw,112px);line-height:1.02;letter-spacing:-3px;font-weight:800}
+h1 span{color:var(--mint);text-shadow:0 0 34px rgba(0,245,208,.65),0 0 10px rgba(0,245,208,.4)}
+.sub{color:var(--grey);font-size:clamp(17px,2.2vw,22px);line-height:1.75;max-width:900px;margin:0 0 56px}
+
+/* ---------- cards with cursor spotlight ---------- */
+.card{
+  position:relative;overflow:hidden;border-radius:26px;
+  background:linear-gradient(180deg,rgba(10,22,25,.92),rgba(5,12,14,.96));
+  border:1px solid var(--mint-dim);
+  transition:border-color .25s,box-shadow .25s,transform .25s;
+}
+.card::before{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s;
+  background:radial-gradient(320px circle at var(--mx,50%) var(--my,50%),rgba(0,245,208,.16),transparent 60%);
+}
+.card:hover{border-color:rgba(0,245,208,.6);box-shadow:0 0 30px rgba(0,245,208,.22),inset 0 0 18px rgba(0,245,208,.05)}
+.card:hover::before{opacity:1}
+.card>*{position:relative;z-index:1}
+
+.detect{display:flex;align-items:center;justify-content:space-between;padding:30px 36px;margin-bottom:26px}
+.detect small{display:block;color:var(--grey);letter-spacing:3px;font-size:13px}
+.detect b{display:block;margin-top:10px;font-size:30px;color:var(--mint);text-shadow:0 0 16px rgba(0,245,208,.4)}
+.dot{width:22px;height:22px;border-radius:50%;background:var(--ok);box-shadow:0 0 18px var(--ok)}
+
+.work{padding:0;margin-bottom:34px}
+.workhead{display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:24px 30px;border-bottom:1px solid var(--mint-dim)}
+.fileicon{width:52px;height:52px;border-radius:14px;border:1px solid var(--mint-line);display:grid;place-items:center;color:var(--mint);font:800 16px Consolas,monospace}
+.workhead .t{flex:1;min-width:160px}
+.workhead .t b{display:block;font-size:20px}
+.workhead .t small{color:var(--grey)}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.ghost,.run,.cta{cursor:pointer;font-family:inherit;font-weight:700;font-size:15px;border-radius:12px;padding:12px 20px;transition:box-shadow .2s,transform .2s,background .2s,border-color .2s}
+.ghost{background:#08161a;color:var(--white);border:1px solid rgba(0,245,208,.16)}
+.ghost:hover{border-color:var(--mint);box-shadow:0 0 16px rgba(0,245,208,.35)}
+.run{background:var(--mint);color:#00120f;border:1px solid var(--mint);box-shadow:0 0 22px rgba(0,245,208,.45)}
+.run:hover{transform:translateY(-2px);box-shadow:0 0 34px rgba(0,245,208,.8)}
+.run:disabled{opacity:.65;cursor:wait;transform:none}
+
+.cols{display:grid;grid-template-columns:1fr 1fr}
+@media(max-width:900px){.cols{grid-template-columns:1fr}}
+.pane{min-width:0}
+.pane+.pane{border-left:1px solid var(--mint-dim)}
+@media(max-width:900px){.pane+.pane{border-left:0;border-top:1px solid var(--mint-dim)}}
+.panehead{padding:14px 24px;color:var(--grey);letter-spacing:2.5px;font-size:12px;display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.04)}
+.panehead #status{color:var(--mint)}
+.editor{display:flex;height:400px}
+#gutter{width:52px;padding:16px 10px 16px 0;text-align:right;color:#35575c;font:13px/1.6 Consolas,"Courier New",monospace;
+  overflow:hidden;background:rgba(0,0,0,.25);border-right:1px solid rgba(255,255,255,.04);user-select:none}
+#gutter div.err{color:#fff;background:var(--red);box-shadow:0 0 12px var(--red);border-radius:3px}
+#code{flex:1;resize:none;border:0;outline:0;background:transparent;color:#e6fffb;padding:16px;
+  font:13px/1.6 Consolas,"Courier New",monospace;white-space:pre;overflow:auto;tab-size:4}
+#code::placeholder{color:#3d6167}
+#out{padding:22px;height:400px;overflow:auto}
+.hint{color:var(--grey);line-height:1.75;margin:0}
+.rc{border:1px solid rgba(255,77,109,.45);background:linear-gradient(180deg,rgba(28,12,20,.9),rgba(16,10,15,.95));
+  border-radius:18px;padding:20px;margin-bottom:16px;box-shadow:0 0 22px rgba(255,77,109,.12)}
+.rc.good{border-color:rgba(61,255,122,.5);background:linear-gradient(180deg,rgba(8,26,18,.9),rgba(6,16,12,.95));box-shadow:0 0 22px rgba(61,255,122,.14)}
+.rc .b{font-weight:800;letter-spacing:1.5px;font-size:15px;color:var(--red);text-shadow:0 0 12px rgba(255,77,109,.6)}
+.rc.good .b{color:var(--ok);text-shadow:0 0 12px rgba(61,255,122,.6)}
+.rc .ln{margin-left:12px;color:var(--mint);font-size:13px;letter-spacing:1px}
+.rc p{white-space:pre-wrap;margin:14px 0 0;line-height:1.7;font-size:17px}
+.lbl{margin:16px 0 8px;color:var(--grey);letter-spacing:2.5px;font-size:12px}
+pre.mono{margin:0;padding:14px 16px;border-radius:12px;background:#010506;border:1px solid rgba(0,245,208,.14);
+  color:#39ffb0;font:14px Consolas,"Courier New",monospace;white-space:pre-wrap;word-break:break-word}
+
+/* ---------- steps ---------- */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin-bottom:64px}
+@media(max-width:1000px){.steps{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.steps{grid-template-columns:1fr}}
+.step{padding:30px 32px}
+.step:hover{transform:translateY(-8px)}
+.step em{font-style:normal;color:var(--mint);font-size:14px;letter-spacing:1px}
+.step b{display:block;margin:22px 0 12px;font-size:26px}
+.step span{color:var(--grey);line-height:1.7;font-size:16px}
+
+/* ---------- quick test ---------- */
+.quick{display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;padding:38px 42px;
+  background:linear-gradient(120deg,rgba(0,245,208,.13),rgba(5,12,14,.95) 60%)}
+.quick small{color:var(--mint);letter-spacing:4px;font-size:13px}
+.quick h2{margin:12px 0 8px;font-size:clamp(26px,4vw,40px)}
+.quick p{margin:0;color:var(--grey);font-size:18px}
+.cta{background:transparent;color:var(--mint);border:1.5px solid var(--mint);font-size:17px;padding:16px 28px}
+.cta:hover{background:rgba(0,245,208,.12);box-shadow:0 0 26px rgba(0,245,208,.55);transform:translateY(-2px)}
+footer{margin-top:40px;text-align:center;color:#3d6167;font-size:13px}
 </style>
 </head>
 <body>
 <div id="cursorGlow"></div>
-<div class="wrap">
-  <header>
-    <div class="brand">CodeSense AI<small>ERROR TUTOR</small></div>
-    <div class="langs">
-      <button class="glow lang" data-lang="java">Java</button>
-      <button class="glow lang" data-lang="python">Python</button>
-      <button class="glow lang" data-lang="c">C</button>
-      <button class="glow lang active" data-lang="auto">Auto Detect</button>
+
+<header class="topbar"><div class="topin">
+  <div class="logo"><div class="logobox">&lt;/&gt;</div><div><b>CodeSense</b><small>AI Error Tutor</small></div></div>
+  <nav class="langs">
+    <button class="lang active" data-lang="java">Java</button>
+    <button class="lang" data-lang="python">Python</button>
+    <button class="lang" data-lang="c">C</button>
+    <button class="lang" data-lang="auto">Auto Detect</button>
+  </nav>
+</div></header>
+
+<main class="wrap">
+  <span class="pill"><i></i>AI-INSPIRED LEARNING</span>
+  <h1>Find the <span>error.</span><br>Understand the <span>error.</span></h1>
+  <p class="sub">Write Java, Python or C code and get beginner-friendly explanations instead of confusing compiler messages.</p>
+
+  <section class="card detect"><div><small>DETECTED LANGUAGE</small><b id="detected">Java</b></div><i class="dot"></i></section>
+
+  <section class="card work" id="work">
+    <div class="workhead">
+      <div class="fileicon">&lt;/&gt;</div>
+      <div class="t"><b id="fname">Main.java</b><small>Write or paste your code, then press Run</small></div>
+      <div class="actions">
+        <button class="ghost" id="clearBtn">Clear</button>
+        <button class="ghost" id="exBtn">Example</button>
+        <button class="run" id="runBtn">&#9654; Run &amp; Explain</button>
+      </div>
     </div>
-  </header>
+    <div class="cols">
+      <div class="pane">
+        <div class="panehead"><span>CODE EDITOR</span><span>Ctrl + Enter to run</span></div>
+        <div class="editor"><div id="gutter"></div><textarea id="code" spellcheck="false" placeholder="Type or paste your Java, Python or C code here..."></textarea></div>
+      </div>
+      <div class="pane">
+        <div class="panehead"><span>TUTOR OUTPUT</span><span id="status"></span></div>
+        <div id="out"><p class="hint">Write some code and press <b>Run &amp; Explain</b>.<br>I will tell you what is wrong in simple English and show how to fix it.</p></div>
+      </div>
+    </div>
+  </section>
 
-  <div class="hero">
-    <h1><span>FIND THE ERROR.</span><br><em>UNDERSTAND THE ERROR.</em></h1>
-    <div class="glow detect"><small>LANGUAGE DETECTED</small><b id="detected">Waiting for code</b></div>
-  </div>
+  <section class="steps">
+    <div class="card step"><em>01</em><b>Detect</b><span>Detects Java, Python and C code automatically.</span></div>
+    <div class="card step"><em>02</em><b>Explain</b><span>Converts technical errors into simple English.</span></div>
+    <div class="card step"><em>03</em><b>Fix</b><span>Shows a simple suggested correction for the error.</span></div>
+    <div class="card step"><em>04</em><b>Run</b><span>Checks your Java, Python and C code and displays the result.</span></div>
+  </section>
 
-  <div class="grid">
-    <section class="glow">
-      <div class="bar"><span id="fname">MAIN CODE</span><button class="run" id="runBtn">&#9654; Run &amp; Explain</button></div>
-      <div class="editor"><div id="gutter"></div><textarea id="code" spellcheck="false" placeholder="Type or paste your Java, Python or C code here..."></textarea></div>
-    </section>
-    <section class="glow">
-      <div class="bar"><span>TUTOR OUTPUT</span><span id="status"></span></div>
-      <div id="out"><p class="hint">Write some code and press <b>Run &amp; Explain</b>.<br>I will tell you what is wrong in simple English and show how to fix it.</p></div>
-    </section>
-  </div>
-
-  <div class="samples">
-    <button class="glow" data-sample="java">Try Java example</button>
-    <button class="glow" data-sample="python">Try Python example</button>
-    <button class="glow" data-sample="c">Try C example</button>
-  </div>
-
-  <div class="steps">
-    <div class="glow step"><b>DETECT</b><small>Finds the language</small></div>
-    <div class="glow step"><b>EXPLAIN</b><small>Simple English</small></div>
-    <div class="glow step"><b>FIX</b><small>Shows the correction</small></div>
-    <div class="glow step"><b>RUN</b><small>Checks your code</small></div>
-  </div>
+  <section class="card quick">
+    <div><small>QUICK TEST</small><h2>Try a missing semicolon</h2><p>Test how CodeSense explains a common beginner error.</p></div>
+    <button class="cta" id="quickBtn">Load Error Example &rarr;</button>
+  </section>
   <footer>CodeSense AI Error Tutor &middot; Java &middot; Python &middot; C</footer>
-</div>
+</main>
 
 <script>
 (function(){
   var $ = function(s){ return document.querySelector(s); };
-  var lang = "auto";
+  var lang = "java";
   var ed = $("#code"), gutter = $("#gutter"), out = $("#out"), btn = $("#runBtn");
   var samples = {
     java: "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hello\")\n    }\n}\n",
     python: "def main()\n    print(\"Hello\")\n\nmain()\n",
     c: "#include <stdio.h>\n\nint main() {\n    printf(\"Hello\")\n    return 0;\n}\n"
   };
-  var names = {java: "Main.java", python: "main.py", c: "main.c", auto: "MAIN CODE"};
+  var names = {java: "Main.java", python: "main.py", c: "main.c", auto: "Your code"};
+  var labels = {java: "Java", python: "Python", c: "C", auto: "Auto Detect"};
 
-  /* neon glow follows the cursor */
+  /* glow that follows the cursor + spotlight inside each card */
   var cg = $("#cursorGlow");
   document.addEventListener("mousemove", function(e){
     cg.style.left = e.clientX + "px"; cg.style.top = e.clientY + "px";
-    var t = e.target.closest ? e.target.closest(".glow") : null;
+    var t = e.target.closest ? e.target.closest(".card") : null;
     if (t) {
       var r = t.getBoundingClientRect();
       t.style.setProperty("--mx", (e.clientX - r.left) + "px");
@@ -849,86 +932,90 @@ footer{margin-top:26px;text-align:center;color:#3d6169;font-size:12px}
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); run(); }
   });
 
-  document.querySelectorAll(".lang").forEach(function(b){
-    b.addEventListener("click", function(){
-      document.querySelectorAll(".lang").forEach(function(x){ x.classList.remove("active"); });
-      b.classList.add("active");
-      lang = b.getAttribute("data-lang");
-      $("#fname").textContent = names[lang];
-      if (lang !== "auto") $("#detected").textContent = b.textContent;
-    });
-  });
-  document.querySelectorAll("[data-sample]").forEach(function(b){
-    b.addEventListener("click", function(){
-      var k = b.getAttribute("data-sample");
-      ed.value = samples[k];
-      drawGutter(0);
-      out.innerHTML = "";
-      var p = document.createElement("p");
-      p.className = "hint";
-      p.textContent = "Example loaded. It has a deliberate mistake. Press Run & Explain to see the tutor find it.";
-      out.appendChild(p);
-    });
-  });
-
   function el(tag, cls, text){
     var e = document.createElement(tag);
     if (cls) e.className = cls;
     if (text !== undefined) e.textContent = text;
     return e;
   }
+  function hint(text){
+    out.innerHTML = "";
+    out.appendChild(el("p", "hint", text));
+    $("#status").textContent = "";
+  }
+
+  document.querySelectorAll(".lang").forEach(function(b){
+    b.addEventListener("click", function(){
+      document.querySelectorAll(".lang").forEach(function(x){ x.classList.remove("active"); });
+      b.classList.add("active");
+      lang = b.getAttribute("data-lang");
+      $("#fname").textContent = names[lang];
+      $("#detected").textContent = labels[lang];
+    });
+  });
+
+  function loadExample(){
+    var k = (lang === "auto") ? "java" : lang;
+    ed.value = samples[k];
+    drawGutter(0);
+    hint("Example loaded. It has a deliberate mistake. Press Run & Explain to see the tutor find it.");
+  }
+  $("#exBtn").addEventListener("click", loadExample);
+  $("#quickBtn").addEventListener("click", function(){
+    loadExample();
+    $("#work").scrollIntoView({behavior: "smooth", block: "start"});
+  });
+  $("#clearBtn").addEventListener("click", function(){
+    ed.value = "";
+    drawGutter(0);
+    hint("Write some code and press Run & Explain.");
+  });
 
   function render(d){
     out.innerHTML = "";
-    if (d.language_label) $("#detected").textContent = d.language_label + (d.detected ? " (auto)" : "");
+    if (d.language_label) $("#detected").textContent = d.language_label + (d.detected ? " (auto detected)" : "");
     var firstLine = 0;
     if (d.errors && d.errors.length) {
       d.errors.forEach(function(er, i){
-        var c = el("div", "card bad");
-        var head = el("div", "badge", "\u26a0 " + String(er.title || "Error").toUpperCase());
-        if (er.line) head.appendChild(el("span", "line", "LINE " + er.line));
+        var c = el("div", "rc");
+        var head = el("div", "b", "\u26a0 " + String(er.title || "Error").toUpperCase());
+        if (er.line) head.appendChild(el("span", "ln", "LINE " + er.line));
         c.appendChild(head);
-        c.appendChild(el("p", "msg", er.explanation || ""));
+        c.appendChild(el("p", "", er.explanation || ""));
         if (er.fix) {
-          c.appendChild(el("div", "fixlabel", "SUGGESTED FIX"));
-          c.appendChild(el("pre", "fix", er.fix));
+          c.appendChild(el("div", "lbl", "SUGGESTED FIX"));
+          c.appendChild(el("pre", "mono", er.fix));
         }
         out.appendChild(c);
         if (i === 0 && er.line) firstLine = er.line;
       });
       $("#status").textContent = "ERROR FOUND";
     } else if (d.status === "ok") {
-      var g = el("div", "card good");
-      g.appendChild(el("div", "badge", "\u2714 LOOKS GOOD"));
-      g.appendChild(el("p", "msg", d.note || d.message || "No mistakes found."));
+      var g = el("div", "rc good");
+      g.appendChild(el("div", "b", "\u2714 LOOKS GOOD"));
+      g.appendChild(el("p", "", d.note || d.message || "No mistakes found."));
       out.appendChild(g);
       $("#status").textContent = "NO ERRORS";
     } else {
-      var w = el("div", "card bad");
-      w.appendChild(el("div", "badge", "\u26a0 NOTICE"));
-      w.appendChild(el("p", "msg", d.message || "Something went wrong."));
+      var w = el("div", "rc");
+      w.appendChild(el("div", "b", "\u26a0 NOTICE"));
+      w.appendChild(el("p", "", d.message || "Something went wrong."));
       out.appendChild(w);
       $("#status").textContent = "";
     }
     if (d.output) {
-      out.appendChild(el("div", "fixlabel", "PROGRAM OUTPUT"));
-      out.appendChild(el("pre", "fix", d.output));
+      out.appendChild(el("div", "lbl", "PROGRAM OUTPUT"));
+      out.appendChild(el("pre", "mono", d.output));
     }
     drawGutter(firstLine);
   }
 
   function run(){
     var code = ed.value;
-    if (!code.trim()) {
-      out.innerHTML = "";
-      out.appendChild(el("p", "hint", "Please type some code first."));
-      return;
-    }
+    if (!code.trim()) { hint("Please type some code first."); return; }
     btn.disabled = true;
     btn.textContent = "Checking...";
-    var slow = setTimeout(function(){
-      $("#status").textContent = "SERVER IS WAKING UP...";
-    }, 4000);
+    var slow = setTimeout(function(){ $("#status").textContent = "SERVER IS WAKING UP..."; }, 4000);
     fetch("/run", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
@@ -937,9 +1024,9 @@ footer{margin-top:26px;text-align:center;color:#3d6169;font-size:12px}
       .then(render)
       .catch(function(){
         out.innerHTML = "";
-        var w = el("div", "card bad");
-        w.appendChild(el("div", "badge", "\u26a0 CANNOT REACH SERVER"));
-        w.appendChild(el("p", "msg", "The server may be waking up. Please wait a few seconds and press Run again."));
+        var w = el("div", "rc");
+        w.appendChild(el("div", "b", "\u26a0 CANNOT REACH SERVER"));
+        w.appendChild(el("p", "", "The server may be waking up. Please wait a few seconds and press Run again."));
         out.appendChild(w);
       })
       .finally(function(){
