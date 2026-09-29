@@ -22,7 +22,7 @@ import time
 import tokenize
 from collections import defaultdict, deque
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, jsonify, request
 from werkzeug.exceptions import HTTPException
 
 app = Flask(__name__)
@@ -683,11 +683,287 @@ def execute(code, lang):
 
 
 # ----------------------------------------------------------------------------
+# The website (HTML + CSS + JavaScript) lives here, so the GitHub repo only needs
+# app.py and requirements.txt
+# ----------------------------------------------------------------------------
+INDEX_HTML = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CodeSense AI Error Tutor</title>
+<style>
+:root{--cyan:#00f0ff;--green:#39ff14;--pink:#ff2d75;--text:#d8f7ff;--muted:#7fa3ab;--panel:#06090d;--line:#12333a}
+*{box-sizing:border-box}
+html,body{margin:0;background:#000;color:var(--text);font-family:"Segoe UI",system-ui,-apple-system,sans-serif}
+body{min-height:100vh;overflow-x:hidden}
+#cursorGlow{position:fixed;width:420px;height:420px;border-radius:50%;pointer-events:none;z-index:0;
+  background:radial-gradient(circle,rgba(0,240,255,.12),transparent 65%);transform:translate(-50%,-50%);left:-999px;top:-999px}
+.wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:18px 18px 40px}
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px}
+.brand{font-weight:800;letter-spacing:.5px;font-size:20px;color:var(--cyan);text-shadow:0 0 12px rgba(0,240,255,.8)}
+.brand small{display:block;color:var(--muted);font-weight:500;font-size:12px;text-shadow:none;letter-spacing:1px}
+.langs{display:flex;flex-wrap:wrap;gap:8px}
+.glow{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  transition:border-color .2s,box-shadow .2s,transform .2s}
+.glow::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .2s;
+  background:radial-gradient(260px circle at var(--mx,50%) var(--my,50%),rgba(0,240,255,.18),transparent 60%)}
+.glow:hover{border-color:var(--cyan);box-shadow:0 0 20px rgba(0,240,255,.5),inset 0 0 14px rgba(0,240,255,.08)}
+.glow:hover::before{opacity:1}
+.lang{cursor:pointer;color:var(--text);font-weight:600;font-size:14px;font-family:inherit;padding:9px 18px;border-radius:999px}
+.lang.active{border-color:var(--green);color:var(--green);box-shadow:0 0 16px rgba(57,255,20,.55)}
+.hero{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:14px;margin-bottom:20px}
+h1{margin:0;font-size:clamp(26px,5vw,46px);line-height:1.05;letter-spacing:1px}
+h1 span{color:var(--cyan);text-shadow:0 0 18px rgba(0,240,255,.8)}
+h1 em{font-style:normal;color:var(--green);text-shadow:0 0 18px rgba(57,255,20,.7)}
+.detect{padding:12px 18px;text-align:right}
+.detect b{display:block;font-size:22px;color:var(--green);text-shadow:0 0 12px rgba(57,255,20,.7)}
+.detect small{color:var(--muted);letter-spacing:1.5px;font-size:11px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:850px){.grid{grid-template-columns:1fr}}
+.bar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);position:relative;z-index:1}
+.bar span{color:var(--muted);font-size:13px;letter-spacing:1px}
+.run{cursor:pointer;border:1px solid var(--green);background:#03130a;color:var(--green);font-weight:700;font-size:14px;font-family:inherit;
+  padding:9px 20px;border-radius:10px;transition:box-shadow .2s,background .2s}
+.run:hover{box-shadow:0 0 20px rgba(57,255,20,.8);background:#062a12}
+.run:disabled{opacity:.6;cursor:wait}
+.editor{display:flex;height:380px;position:relative;z-index:1}
+#gutter{width:46px;padding:12px 8px 12px 0;text-align:right;color:#3d6169;font:13px/1.55 Consolas,"Courier New",monospace;
+  overflow:hidden;background:#04070a;border-right:1px solid var(--line);user-select:none;white-space:pre}
+#gutter .err{color:#fff;background:var(--pink);box-shadow:0 0 10px var(--pink);display:block;border-radius:3px}
+#gutter div{display:block}
+#code{flex:1;resize:none;border:0;outline:0;background:transparent;color:#e8fbff;padding:12px;
+  font:13px/1.55 Consolas,"Courier New",monospace;white-space:pre;overflow:auto;tab-size:4}
+#out{padding:14px;height:380px;overflow:auto;position:relative;z-index:1}
+.card{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;background:#04070a}
+.card.bad{border-color:var(--pink);box-shadow:0 0 18px rgba(255,45,117,.45)}
+.card.good{border-color:var(--green);box-shadow:0 0 18px rgba(57,255,20,.4)}
+.badge{font-weight:800;letter-spacing:1px;font-size:15px}
+.bad .badge{color:var(--pink);text-shadow:0 0 10px rgba(255,45,117,.8)}
+.good .badge{color:var(--green);text-shadow:0 0 10px rgba(57,255,20,.8)}
+.line{display:inline-block;margin-left:8px;color:var(--cyan);font-size:13px}
+.msg{white-space:pre-wrap;margin:10px 0 0;line-height:1.55}
+.fixlabel{margin-top:12px;color:var(--muted);font-size:12px;letter-spacing:1.5px}
+pre.fix{margin:6px 0 0;padding:10px;border-radius:8px;background:#000;border:1px solid #0d4a2a;color:var(--green);
+  font:13px Consolas,"Courier New",monospace;white-space:pre-wrap;word-break:break-word}
+.hint{color:var(--muted);line-height:1.6}
+.samples{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0}
+.samples button{cursor:pointer;font-weight:600;font-size:13px;font-family:inherit;color:var(--text);padding:8px 14px;border-radius:10px}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+@media(max-width:700px){.steps{grid-template-columns:repeat(2,1fr)}}
+.step{padding:14px;text-align:center}
+.step b{display:block;color:var(--cyan);letter-spacing:2px;font-size:14px}
+.step small{color:var(--muted)}
+footer{margin-top:26px;text-align:center;color:#3d6169;font-size:12px}
+</style>
+</head>
+<body>
+<div id="cursorGlow"></div>
+<div class="wrap">
+  <header>
+    <div class="brand">CodeSense AI<small>ERROR TUTOR</small></div>
+    <div class="langs">
+      <button class="glow lang" data-lang="java">Java</button>
+      <button class="glow lang" data-lang="python">Python</button>
+      <button class="glow lang" data-lang="c">C</button>
+      <button class="glow lang active" data-lang="auto">Auto Detect</button>
+    </div>
+  </header>
+
+  <div class="hero">
+    <h1><span>FIND THE ERROR.</span><br><em>UNDERSTAND THE ERROR.</em></h1>
+    <div class="glow detect"><small>LANGUAGE DETECTED</small><b id="detected">Waiting for code</b></div>
+  </div>
+
+  <div class="grid">
+    <section class="glow">
+      <div class="bar"><span id="fname">MAIN CODE</span><button class="run" id="runBtn">&#9654; Run &amp; Explain</button></div>
+      <div class="editor"><div id="gutter"></div><textarea id="code" spellcheck="false" placeholder="Type or paste your Java, Python or C code here..."></textarea></div>
+    </section>
+    <section class="glow">
+      <div class="bar"><span>TUTOR OUTPUT</span><span id="status"></span></div>
+      <div id="out"><p class="hint">Write some code and press <b>Run &amp; Explain</b>.<br>I will tell you what is wrong in simple English and show how to fix it.</p></div>
+    </section>
+  </div>
+
+  <div class="samples">
+    <button class="glow" data-sample="java">Try Java example</button>
+    <button class="glow" data-sample="python">Try Python example</button>
+    <button class="glow" data-sample="c">Try C example</button>
+  </div>
+
+  <div class="steps">
+    <div class="glow step"><b>DETECT</b><small>Finds the language</small></div>
+    <div class="glow step"><b>EXPLAIN</b><small>Simple English</small></div>
+    <div class="glow step"><b>FIX</b><small>Shows the correction</small></div>
+    <div class="glow step"><b>RUN</b><small>Checks your code</small></div>
+  </div>
+  <footer>CodeSense AI Error Tutor &middot; Java &middot; Python &middot; C</footer>
+</div>
+
+<script>
+(function(){
+  var $ = function(s){ return document.querySelector(s); };
+  var lang = "auto";
+  var ed = $("#code"), gutter = $("#gutter"), out = $("#out"), btn = $("#runBtn");
+  var samples = {
+    java: "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hello\")\n    }\n}\n",
+    python: "def main()\n    print(\"Hello\")\n\nmain()\n",
+    c: "#include <stdio.h>\n\nint main() {\n    printf(\"Hello\")\n    return 0;\n}\n"
+  };
+  var names = {java: "Main.java", python: "main.py", c: "main.c", auto: "MAIN CODE"};
+
+  /* neon glow follows the cursor */
+  var cg = $("#cursorGlow");
+  document.addEventListener("mousemove", function(e){
+    cg.style.left = e.clientX + "px"; cg.style.top = e.clientY + "px";
+    var t = e.target.closest ? e.target.closest(".glow") : null;
+    if (t) {
+      var r = t.getBoundingClientRect();
+      t.style.setProperty("--mx", (e.clientX - r.left) + "px");
+      t.style.setProperty("--my", (e.clientY - r.top) + "px");
+    }
+  });
+
+  function drawGutter(errLine){
+    var n = ed.value.split("\n").length;
+    gutter.textContent = "";
+    for (var i = 1; i <= n; i++) {
+      var d = document.createElement("div");
+      d.textContent = i;
+      if (i === errLine) d.className = "err";
+      gutter.appendChild(d);
+    }
+    gutter.scrollTop = ed.scrollTop;
+  }
+  ed.addEventListener("input", function(){ drawGutter(0); });
+  ed.addEventListener("scroll", function(){ gutter.scrollTop = ed.scrollTop; });
+  ed.addEventListener("keydown", function(e){
+    if (e.key === "Tab") {
+      e.preventDefault();
+      var s = ed.selectionStart;
+      ed.value = ed.value.slice(0, s) + "    " + ed.value.slice(ed.selectionEnd);
+      ed.selectionStart = ed.selectionEnd = s + 4;
+      drawGutter(0);
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); run(); }
+  });
+
+  document.querySelectorAll(".lang").forEach(function(b){
+    b.addEventListener("click", function(){
+      document.querySelectorAll(".lang").forEach(function(x){ x.classList.remove("active"); });
+      b.classList.add("active");
+      lang = b.getAttribute("data-lang");
+      $("#fname").textContent = names[lang];
+      if (lang !== "auto") $("#detected").textContent = b.textContent;
+    });
+  });
+  document.querySelectorAll("[data-sample]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var k = b.getAttribute("data-sample");
+      ed.value = samples[k];
+      drawGutter(0);
+      out.innerHTML = "";
+      var p = document.createElement("p");
+      p.className = "hint";
+      p.textContent = "Example loaded. It has a deliberate mistake. Press Run & Explain to see the tutor find it.";
+      out.appendChild(p);
+    });
+  });
+
+  function el(tag, cls, text){
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function render(d){
+    out.innerHTML = "";
+    if (d.language_label) $("#detected").textContent = d.language_label + (d.detected ? " (auto)" : "");
+    var firstLine = 0;
+    if (d.errors && d.errors.length) {
+      d.errors.forEach(function(er, i){
+        var c = el("div", "card bad");
+        var head = el("div", "badge", "\u26a0 " + String(er.title || "Error").toUpperCase());
+        if (er.line) head.appendChild(el("span", "line", "LINE " + er.line));
+        c.appendChild(head);
+        c.appendChild(el("p", "msg", er.explanation || ""));
+        if (er.fix) {
+          c.appendChild(el("div", "fixlabel", "SUGGESTED FIX"));
+          c.appendChild(el("pre", "fix", er.fix));
+        }
+        out.appendChild(c);
+        if (i === 0 && er.line) firstLine = er.line;
+      });
+      $("#status").textContent = "ERROR FOUND";
+    } else if (d.status === "ok") {
+      var g = el("div", "card good");
+      g.appendChild(el("div", "badge", "\u2714 LOOKS GOOD"));
+      g.appendChild(el("p", "msg", d.note || d.message || "No mistakes found."));
+      out.appendChild(g);
+      $("#status").textContent = "NO ERRORS";
+    } else {
+      var w = el("div", "card bad");
+      w.appendChild(el("div", "badge", "\u26a0 NOTICE"));
+      w.appendChild(el("p", "msg", d.message || "Something went wrong."));
+      out.appendChild(w);
+      $("#status").textContent = "";
+    }
+    if (d.output) {
+      out.appendChild(el("div", "fixlabel", "PROGRAM OUTPUT"));
+      out.appendChild(el("pre", "fix", d.output));
+    }
+    drawGutter(firstLine);
+  }
+
+  function run(){
+    var code = ed.value;
+    if (!code.trim()) {
+      out.innerHTML = "";
+      out.appendChild(el("p", "hint", "Please type some code first."));
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = "Checking...";
+    var slow = setTimeout(function(){
+      $("#status").textContent = "SERVER IS WAKING UP...";
+    }, 4000);
+    fetch("/run", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({code: code, language: lang})
+    }).then(function(r){ return r.json(); })
+      .then(render)
+      .catch(function(){
+        out.innerHTML = "";
+        var w = el("div", "card bad");
+        w.appendChild(el("div", "badge", "\u26a0 CANNOT REACH SERVER"));
+        w.appendChild(el("p", "msg", "The server may be waking up. Please wait a few seconds and press Run again."));
+        out.appendChild(w);
+      })
+      .finally(function(){
+        clearTimeout(slow);
+        btn.disabled = false;
+        btn.innerHTML = "&#9654; Run &amp; Explain";
+      });
+  }
+  btn.addEventListener("click", run);
+  drawGutter(0);
+})();
+</script>
+</body>
+</html>
+"""
+
+
+# ----------------------------------------------------------------------------
 # Routes
 # ----------------------------------------------------------------------------
 @app.route("/")
 def index():
-    return render_template("index.html")
+    # The whole website is stored inside this file, so no templates/ or static/ folder is needed.
+    return Response(INDEX_HTML, mimetype="text/html")
 
 
 @app.route("/health")
